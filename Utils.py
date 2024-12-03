@@ -15,17 +15,22 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Exception handling
+# Declaring variables
+chromedriverfilepath = r'.\chromedriver.exe'   # Need to always check that the chromedriver version is compatible with the computer chrome version, https://googlechromelabs.github.io/chrome-for-testing/
+
+# Custom exception handling class
 class MyError(Exception):
     def __init__(self, value):
         self.value = value
 
+    # Defining __str__ so that print() returns this
     def __str__(self):
-        return repr(self.value)
+        return self.value
 
-def initialise_driver(chromedriverfilepath, headlessflg = False):
+
+def initialise_driver(chromedriverfilepath, headlessflg=False):
     """
-    This function takes in the filepath pointing to the chromedriver.exe file 
+    This function takes in the filepath pointing to the chromedriver.exe file
     and initialise the chromium web driver, taking into consideration whether
     headless or otherwise
 
@@ -37,8 +42,8 @@ def initialise_driver(chromedriverfilepath, headlessflg = False):
 
     Raises
     ------
-    MyError : Inform user that Chrome Webdriver file path cannot be located
-    
+    MyError (str) : Inform user that Chrome Webdriver file path cannot be located
+
     Returns
     -------
     driver (object) : webdriver
@@ -47,45 +52,49 @@ def initialise_driver(chromedriverfilepath, headlessflg = False):
         # Tune setup options
         options = Options()
         options.headless = headlessflg  # Decides whether headless mode or not
-            #options.add_argument("--window-size=1920,1080")  # Define the window size of the browser 1920x1080 px
-        options.add_argument("--start-maximized")  #maximise the browser window
+        # options.add_argument("--window-size=1920,1080")  # Define the window size of the browser 1920x1080 px
+        options.add_argument("--start-maximized")  # maximise the browser window
         cService = webdriver.ChromeService(executable_path=chromedriverfilepath)
-        driver = webdriver.Chrome(options=options, service = cService)
+        driver = webdriver.Chrome(options=options, service=cService)
         return driver
     else:
         raise MyError("Unable to locate Chrome Webdriver filepath")
-    
+
+
 def scroll_to_bottom(element, driver):
     """
-    When given a scrollable Selenium element and Selenium Chrome Webdriver, 
+    Given a scrollable Selenium element and Selenium Chrome Webdriver,
     this function scrolls to the bottom of the element.
-    
+
     Args:
     ----------
     element(object): Selenium element
     driver(object): Selenium Chrome Webdriver
-    
+
     Returns:
     -------
     None
 
     """
+    # Initialise the current height marker and assign to zero
     ht0 = 0
     # get the element's initial visible scrollable height
     ht1 = driver.execute_script("return arguments[0].scrollHeight", element)
     while ht0 < ht1:
-        # scroll to the bottom of the element's visible scrollable height
+        # scroll to the bottom of the element's current visible scrollable height
         driver.execute_script('arguments[0].scrollTo(0,arguments[1])', element, ht1)
         # stop running the script for 1sec to allow time for elements to load
         time.sleep(1)
+        # assign the element's current visible scrollable height to the current height marker 
         ht0 = ht1
-        # extract the element's current visible scrollable height
+        # extract the element's new visible scrollable height after scrolling
         ht1 = driver.execute_script("return arguments[0].scrollHeight", element)
+
 
 def datediff(scrapedate, durdiff):
     """
-    This function takes in a date and duration difference and calculates a date that is 
-    relative to the input date by the duration difference
+    This function takes in an input date and duration difference and calculates 
+    a new date that is relative to the input date by the duration difference
 
     Args:
     ----------
@@ -98,36 +107,37 @@ def datediff(scrapedate, durdiff):
 
     """
     if durdiff == '':
+        # Essentially set the review contribution date as the date of scraping
         contributiondate = scrapedate - relativedelta()
     else:
         numdiff = 1 if durdiff.split()[0] == 'a' else int(durdiff.split()[0])
-        perioddiff = durdiff.split()[1]+'s' if durdiff.split()[1][-1]!='s' else durdiff.split()[1]
+        # Provide the plural form of periods(e.g. months, weeks, years, days)
+        perioddiff = durdiff.split()[1]+'s' if durdiff.split()[1][-1] != 's' else durdiff.split()[1]
+        # Subtract the duration difference from the date of scraping
         contributiondate = scrapedate - relativedelta(**{perioddiff:numdiff})
     
+    # return in the form of day mon year
     return contributiondate.strftime('%d %b %Y')
+
 
 def read_ID(reviewfilepath, target=[], idx=''):
     """
     This function takes in the filepath pointing to the file containing google reviews 
-    related to business entity. It then reads in the file and extracts the list of
+    of business entities. It then reads in the file and extracts the list of corresponding
     reviewer IDs. As the file may contain different business entities, this function
-    allows user to select reviews corresponding to certain target businesses. Instead of 
-    selecting all the reviewer IDs, this function allows the user to subset the reviewer
-    IDs list from certain reviewer ID onwards
-
-    # target business (use only when need to subset and target contributors for specific business)
-    target = 'Queen Beauty Toa Payoh'
-    # target contributorID (use this only when program fails halfway and you want to start from certain contributor onwards)
+    allows user to select reviews corresponding to certain target business entities. Instead of 
+    selecting all the reviewer IDs, this function also allows the user to subset the reviewer
+    IDs list from certain reviewer ID onwards.
 
     Args:
     ----------
     reviewfilepath (str) : absolute filepath pointing to the google review file
-    target (list) : list of target businesses to extract reviewer IDs from. The default is [].
+    target (list) : list of target business entities to extract reviewer IDs from. The default is [].
     idx (str) : reviewer ID to subset list of reviewer IDs from. The default is ''.
 
     Raises
     ------
-    MyError: Refer to the script for the error messages
+    MyError (str): Refer to the script for the error messages
 
     Returns
     -------
@@ -140,6 +150,7 @@ def read_ID(reviewfilepath, target=[], idx=''):
         if set(['Reviewer_ID', 'BusinessName']).issubset(df.columns):
             # If target businesses specified
             if len(target) > 0:
+                # filter the specific business and extract the reviewers ID
                 df= df[df['BusinessName'].isin(target)]
                 IDlist= df.Reviewer_ID.apply(lambda x: re.search(r'\d+', x)[0]).tolist()
             # else consider all businesses
@@ -151,7 +162,7 @@ def read_ID(reviewfilepath, target=[], idx=''):
         else:
             raise MyError("Reviewer_ID and BusinessName field names expected, but cannot be found in Google reviews file, please check.")
     else:
-        raise MyError("Google reviews file containing list of google contributor IDs not available, please check.")
+        raise MyError("File not available, please check.")
 
 
 def scroll_screenshot(element, driver, imagefilepath, stitchflg=True):
@@ -177,37 +188,41 @@ def scroll_screenshot(element, driver, imagefilepath, stitchflg=True):
     # create the folder to store images, if it does not yet exist
     if not os.path.exists(imagefilepath):
         os.makedirs(imagefilepath)
-        
+
     # Scroll to top of element so as to take screenshot from top to bottom
     driver.execute_script('arguments[0].scrollTo(0,arguments[1])', element, 0)
-    
-    # Get the max scroll height of the element
+
+    # Get the element's maximum scrollable height
     finalscrollht = driver.execute_script("return arguments[0].scrollHeight", element)
-    
-    # As long as element max height is not reach, keep scrolling and take screenshots along the way
+
+    # As long as element max height is not reached, keep scrolling and take screenshots along the way
     while offset < finalscrollht:
         # Scrolling element
         driver.execute_script('arguments[0].scrollTo(0,arguments[1])', element, offset)
-        # Take screenshot image of visible real estate
+        # Take screenshot image, in bytes, of visible real estate
         img = Image.open(BytesIO(element.screenshot_as_png))
+        # Increment offset by the image height
         offset += img.size[1]
-        # storing each screenshot as bytes to a list, for stitching if activated
+        # Appending each screenshot to a list, for stitching if activated
         slices.append(img)
         # Take screenshot image of visible real estate and store as png format
         element.screenshot(imagefilepath + f'\screen_{offset}.png')
         print (offset, finalscrollht)
     print('Screenshots of all reviews taken.')
-    
+
     # To trim off duplicated portion from the last image
     extra_height = offset - finalscrollht
+    # Proceed only if more than 1 image is captured
     if extra_height > 0 and len(slices) > 1:
-       pixel_ratio = driver.execute_script("return window.devicePixelRatio")
-       extra_height *= pixel_ratio
-       last_image = slices[-1]
-       width, height = last_image.size
-       box = (0, extra_height, width, height)
-       slices[-1] = last_image.crop(box)
-    
+        # extract browser pixel
+        pixel_ratio = driver.execute_script("return window.devicePixelRatio")
+        extra_height *= pixel_ratio
+        last_image = slices[-1]
+        width, height = last_image.size
+        # box = (left, top, right, bottom) left-top is (0,0)
+        box = (0, extra_height, width, height)
+        slices[-1] = last_image.crop(box)
+
     if stitchflg:
         # Stitch all images into one long image
         print('Stitching all images into one big image')
@@ -218,5 +233,5 @@ def scroll_screenshot(element, driver, imagefilepath, stitchflg=True):
             img_frame.paste(img_frag, (0, offset))
             offset += img_frag.size[1]
         img_frame.save(imagefilepath + '\stitchedimage.png')
-        
+
         print('Screenshots of all reviews stitched into one long image.')
